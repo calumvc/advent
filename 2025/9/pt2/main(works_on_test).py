@@ -26,7 +26,6 @@ def coordify(reds:list[list[int]]) -> list[coord]:
     return new_reds
 
 def populate(reds: list[coord]) -> list[list[str]]:
-    greens = [[int]]
     graph = init_graph(reds)
 
     for i in range(0, len(reds)):
@@ -71,7 +70,7 @@ def init_graph(reds: list[coord]) -> list[list[str]]:
     for i in range(0, max_y+1):
         graph.append([" "])
 
-        for j in range(0, max_x+1):
+        for _ in range(0, max_x+1):
             graph[i].append(" ")
 
     return graph
@@ -162,7 +161,7 @@ def floorplan(reds: list[coord], graph: list[list[str]]) -> float:
             bl = coord((min(reds[i].x, reds[j].x)), max(reds[i].y, reds[j].y))
             br = coord((max(reds[i].x, reds[j].x)), max(reds[i].y, reds[j].y))
 
-            # print(f"4 corners: TL - {tl.x, tl.y} - TR - {tr.x, tr.y} - BL - {bl.x, bl.y} - BR - {br.x, br.y}")
+            print(f"4 corners: TL - {tl.x, tl.y} - TR - {tr.x, tr.y} - BL - {bl.x, bl.y} - BR - {br.x, br.y}")
 
             for k in range(tl.y, bl.y+1):
                 for l in range(tl.x, br.x+1):
