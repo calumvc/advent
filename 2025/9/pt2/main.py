@@ -1,7 +1,7 @@
 from enum import Enum
 
 def main():
-    with open("puzz") as f:
+    with open("puzzle") as f:
         reds = [list(map(int, line.split(","))) for line in f.read().splitlines()]
 
     reds = coordify(reds)
@@ -26,12 +26,26 @@ class edge():
         self.direction = direction
 
 class rect():
-    def __init__(self, tl: coord, tr: coord, bl: coord, br: coord, area: int) -> None:
+    def __init__(self, tl: coord, tr: coord, bl: coord, br: coord, area: int, valid_edges = []) -> None:
         self.tl = tl
         self.tr = tr
         self.bl = bl
         self.br = br
         self.area = area
+        self.valid_edges = valid_edges
+
+    def init_cast(self, edges: list[edge]) -> None:
+        valid = []
+        for edge in edges: # do we intersect with any vertical lines
+            if edge.a.x < self.bl.x and edge.a.x < self.br.x:
+                continue
+
+            if edge.b.x < self.bl.x and edge.b.x < self.br.x:
+                continue
+
+            valid.append(edge)
+
+        self.valid_edges = valid
 
 def coordify(reds:list[list[int]]) -> list[coord]:
     new_reds = []
@@ -54,157 +68,111 @@ def edgeify(reds:list[coord]) -> list[edge]:
 def print_edge(edge: edge) -> None:
     print(f"Edge from {(edge.a.x, edge.a.y)} to {(edge.b.x, edge.b.y)} {edge.direction.name}")
 
-def edge_corner(edge: edge, point: coord) -> str:
-    if edge.a.x == point.x and edge.a.y  == point.y:
-        return "A"
-
-    if edge.b.x == point.x and edge.b.y == point.y:
-        return "B" 
-
-    return "N"
-
 def get_edges(r: rect) -> list[edge]:
     edges = []
 
-    edges.append(edge(r.tl, r.tr, direction.HORIZONTAL))
-    edges.append(edge(r.bl, r.br, direction.HORIZONTAL))
     edges.append(edge(r.tl, r.bl, direction.VERTICAL))
     edges.append(edge(r.tr, r.br, direction.VERTICAL))
 
     return edges
 
-def linify(input: tuple[coord, coord]) -> list[coord]:
-    line = []
+def ray_cast(p: coord, r: rect) -> bool:
+    # iterate over vertical lines going and count intersections
+    intersections = 0
 
-    max_x = max(input[0].x, input[1].x)
-    min_x = min(input[0].x, input[1].x)
-    max_y = max(input[0].y, input[1].y)
-    min_y = min(input[0].y, input[1].y)
+    for edge in r.valid_edges: # do we intersect with any vertical lines
+        if (p.x < edge.a.x) and p.y < max(edge.a.y, edge.b.y) and p.y >= min(edge.a.y, edge.b.y):
+            intersections += 1
 
-    if max_x - min_x > max_y - min_y:
-        for i in range(0, max_x - min_x + 1):
-            line.append(coord(min_x + i, min_y))
-
-    else:
-        for i in range(0, max_y - min_y + 1):
-            line.append(coord(min_x, min_y + i))
-
-    return line
-
-def intersection(p: coord, edge: edge) -> bool: 
-    line = linify((edge.a, edge.b))
-
-    # print("NEW INT-----------")
-    # print(f" X {p.x} Y {p.y}")
-    # print(f"A X {edge.a.x} Y {edge.a.y}")
-    # print(f"B X {edge.b.x} Y {edge.b.y}")
-
-    count = 0
-    for i in range(0, len(line)):
-        if p.x == line[i].x and p.y == line[i].y:
-            count += 1
-        
-    if count == 1:
-        # print("INT")
-        return True
-   
-    return False
-
-def ray_cast(p: coord, edges: list[edge], r: rect) -> bool: # not even raycasting
-    hoz = []
-    ver = []
-
-    for edge in edges:
-        if edge.direction == direction.HORIZONTAL:
-            hoz.append(edge)
-        else:
-            ver.append(edge)
-
-    # iterate over both horizontal and vertical ones going both ways and count intersections
-    l_intersections = 0
-    r_intersections = 0
-    for i in range(0, len(ver)): # do we intersect with any vertical lines
-
-        for j in range(p.x, r.br.x + 1):
-            # print(j)
-            # print(r.br.x)
-            if intersection(coord(j, p.y), ver[i]):
-                r_intersections += 1
-
-        for j in range(r.tl.x - 1, p.x):
-            if intersection(coord(j, p.y), ver[i]):
-                l_intersections += 1
-
-    # print(f"L {l_intersections}")
-    # print(f"R {r_intersections}")
-
-    if l_intersections % 2 == 0 and l_intersections > 0:
-        return False
-
-    if r_intersections % 2 == 0 and r_intersections > 0:
-        return False
-
-    u_intersections = 0
-    d_intersections = 0
-
-    for i in range(0, len(hoz)): # do we intersect with any horizontal lines
-
-        for j in range(p.y, r.br.y + 1):
-            if intersection(coord(p.x, j), ver[i]):
-                d_intersections += 1
-
-        for j in range(r.tl.y - 1, p.y):
-            if intersection(coord(p.x, j), ver[i]):
-                u_intersections += 1
-
-    # print(f"U {u_intersections}")
-    # print(f"D {d_intersections}")
-
-    if d_intersections % 2 == 0 and d_intersections > 0:
-        return False
-
-    if u_intersections % 2 == 0 and u_intersections > 0:
-        return False
+    if intersections % 2 == 0: return False
 
     return True
+
+def sort_rects(l: list[rect]) -> list[rect]:
+    l.sort(key = lambda x: x.area, reverse = True)
+    
+    return l
 
 def floorplan(reds: list[coord], edges: list[edge]) -> float:
     largest = float('-inf')
 
-    # print(ray_cast(coord(4, 4), edges, rect(coord(2, 3), coord(7, 3), coord(2, 5), coord(7, 5), 9))) # should print true
-    # print(ray_cast(coord(5, 6), edges, rect(coord(2, 3), coord(7, 3), coord(2, 5), coord(7, 5), 9))) # should print true
-    # print(ray_cast(coord(11, 11), edges, rect(coord(2, 3), coord(7, 3), coord(2, 5), coord(7, 5), 9))) # should print true
-    # print(ray_cast(coord(3, 2), edges, rect(coord(2, 1), coord(11, 1), coord(2, 5), coord(11, 5), 9))) # should print true
-    # print(ray_cast(coord(4, 4), edges, rect(coord(2, 1), coord(11, 1), coord(2, 5), coord(11, 5), 9))) # should print true
+    print("--Checking rects--")
 
-    for i in range(0, len(reds)):
-        for j in range(i + 1, len(reds)):
+    lenr = len(reds)
 
-            tl = coord((min(reds[i].x, reds[j].x)), min(reds[i].y, reds[j].y))
-            tr = coord((max(reds[i].x, reds[j].x)), min(reds[i].y, reds[j].y))
-            bl = coord((min(reds[i].x, reds[j].x)), max(reds[i].y, reds[j].y))
-            br = coord((max(reds[i].x, reds[j].x)), max(reds[i].y, reds[j].y))
+    rects = []
 
-            area = (max(reds[i].x, reds[j].x) - min(reds[i].x, reds[j].x) + 1) * (max(reds[i].y, reds[j].y) - min(reds[i].y, reds[j].y) + 1)
+    for i in range(0, lenr):
+        for j in range(i + 1, lenr):
 
-            print(f"4 corners: TL - {tl.x, tl.y} - TR - {tr.x, tr.y} - BL - {bl.x, bl.y} - BR - {br.x, br.y}")
+            red_a = reds[i]
+            red_b = reds[j]
+
+            area = (max(red_a.x, red_b.x) - min(red_a.x, red_b.x) + 1) * (max(red_a.y, red_b.y) - min(red_a.y, red_b.y) + 1)
+
+            tl = coord((min(red_a.x, red_b.x)), min(red_a.y, red_b.y))
+            tr = coord((max(red_a.x, red_b.x)), min(red_a.y, red_b.y))
+            bl = coord((min(red_a.x, red_b.x)), max(red_a.y, red_b.y))
+            br = coord((max(red_a.x, red_b.x)), max(red_a.y, red_b.y))
 
             r = rect(tl, tr, bl, br, area)
 
-            if r.area > largest:
+            rects.append(r)
 
-                bad = False
+    r = sort_rects(rects)
 
-                for k in range(r.tl.x, r.br.x):
-                    for l in range(r.tl.y, r.br.y):
-                        if ray_cast(coord(k, l), edges, r) == False: # the only things passing this are direct lines
-                            bad = True
-                            break
+    for r in rects:
+        if r.area > 1429999999:
+            continue
+        print(f"New rect -> {r.area}")
 
-                if bad == False:
-                    largest = r.area
+        if r.area <= largest:
+            continue
 
-    return largest
+        r.init_cast(edges)
+
+        bad = False
+
+        for k in range(r.tl.x + 1, r.br.x - 1): # the row below the top row
+            if ray_cast(coord(k, r.tl.y + 1), r) == False:
+                bad = True
+                break
+        
+        if bad == True:
+            continue
+
+        for l in range(r.bl.x + 1, r.br.x - 1): # the row above the bottom row
+            if ray_cast(coord(l, r.br.y - 1), r) == False:
+                bad = True
+                break
+
+        if bad == True:
+            continue
+
+        for m in range(r.tl.y + 1, r.br.y - 1): # the row above the bottom row
+            if ray_cast(coord(r.tl.x + 1, m), r) == False:
+                bad = True
+                break
+
+        if bad == True:
+            continue
+
+        for n in range(r.tr.y + 1, r.br.y - 1): # the row above the bottom row
+            if ray_cast(coord(r.tr.x - 1, n), r) == False:
+                bad = True
+                break
+
+        if bad == True:
+            continue
+
+        return r.area
+
+    return -1 
 
 if __name__ == '__main__':
     main()
+
+# answer > 129411462 unless code is wrong
+# 224891505 
+# 328493280
+# 771940415
